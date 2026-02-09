@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-16"?>
+<SerializationRoot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <WorkflowType>2</WorkflowType>
+    <IsTestCase>false</IsTestCase>
+    <UseArgs>false</UseArgs>
+    <ColumnsTableTestData />
+    <RowsTableTestData />
+    <ScriptType>CS</ScriptType>
+    <RootContainer>
+        <ClassName>LTools.Workflow.View.WFOnlyCode</ClassName>
+        <AssemblyName>LTools.Workflow, Version=1.0.6.1, Culture=neutral, PublicKeyToken=null</AssemblyName>
+        <Properties>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ComponentName</Name>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ComponentID</Name>
+                <Value xmlns:q1="http://microsoft.com/wsdl/types/" xsi:type="q1:guid">00000000-0000-0000-0000-000000000000</Value>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ContinueOnException</Name>
+                <Value xsi:type="xsd:boolean">false</Value>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>Variables</Name>
+                <Value xsi:type="ArrayOfScriptVariable" />
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ScriptCode</Name>
+                <Value xsi:type="xsd:string">using System;
+using System.Collections.Generic;
+using System.Text;
+using LTools.Scripting.Model;
+using LTools.Network.Model;
+using DevExpress.Spreadsheet;
+
+public class PrimoScript
+{
+    public static LTools.Scripting.CSharp.ScriptDebugger __debug;
+
+    public void main(LTools.Common.Model.WorkflowData wf)
+    {
+        String str_pathFileRangeCopied = wf.GetArgument("in_pathFileRangeCopied").ToString();
+		String str_pathMainFileInsert = wf.GetArgument("in_pathMainFileInsert").ToString();
+		String str_sheetCopyingRange = wf.GetArgument("in_sheetCopyingRange").ToString();
+		String str_sheetInsertingRange = wf.GetArgument("in_sheetInsertingRange").ToString();
+		String str_copiedRange = wf.GetArgument("in_copiedRange").ToString();
+		String str_rangeToBeCopied = wf.GetArgument("in_rangeToBeCopied").ToString();
+		
+		Workbook wb_mainFileInsertingRange = new Workbook();//Объявление основного Excel файла, куда будет копироваться диапазон
+        wb_mainFileInsertingRange.LoadDocument(str_pathMainFileInsert);//Подгрузка файла, куда будет копироваться диапазон
+        
+        Workbook wb_excelFileBeingCopied = new Workbook();//Объявление Excel файла, с которого будет скопирован диапазон
+        wb_excelFileBeingCopied.LoadDocument(str_pathFileRangeCopied);//Подгрузка файла, с которого будет скопирован диапазон
+
+        Worksheet ws_excelSheetBeingCopied = wb_excelFileBeingCopied.Worksheets[str_sheetCopyingRange];//Получение копируемого листа
+        Worksheet ws_mainSheetInsertingRange = wb_mainFileInsertingRange.Worksheets[str_sheetInsertingRange];//Получение листа, в который будет совершено копирование
+
+        ws_mainSheetInsertingRange.Range[str_rangeToBeCopied].CopyFrom(ws_excelSheetBeingCopied.Range[str_copiedRange]);//Копирование диапазона с одного листа на другой
+		//Сохранение измененного основного excel файла
+        wb_mainFileInsertingRange.SaveDocument(str_pathMainFileInsert);
+    }
+}
+</Value>
+            </SerializationItem>
+        </Properties>
+        <IsBreakpoint>false</IsBreakpoint>
+        <IsIgnore>false</IsIgnore>
+        <Components />
+    </RootContainer>
+    <GlobalVariables />
+    <Arguments>
+        <ScriptVariable>
+            <Name>in_copiedRange</Name>
+            <Group />
+            <Comment>Диапазон, который будет скопирован</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_pathMainFileInsert</Name>
+            <Group />
+            <Comment>Путь до основного файла для вставки листа</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_pathFileRangeCopied</Name>
+            <Group />
+            <Comment>Путь до файла с которого скопирован диапазон</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_rangeToBeCopied</Name>
+            <Group />
+            <Comment>Диапазон в который будет совершено копирование</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_sheetCopyingRange</Name>
+            <Group />
+            <Comment>Лист для копирования диапазона</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_sheetInsertingRange</Name>
+            <Group />
+            <Comment>Лист для вставки диапазона</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+    </Arguments>
+</SerializationRoot>
