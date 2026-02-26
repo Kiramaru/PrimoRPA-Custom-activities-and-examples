@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-16"?>
+<SerializationRoot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <WorkflowType>2</WorkflowType>
+    <IsTestCase>false</IsTestCase>
+    <UseArgs>false</UseArgs>
+    <ColumnsTableTestData />
+    <RowsTableTestData />
+    <ScriptType>CS</ScriptType>
+    <RootContainer>
+        <ClassName>LTools.Workflow.View.WFOnlyCode</ClassName>
+        <AssemblyName>LTools.Workflow, Version=1.0.6.1, Culture=neutral, PublicKeyToken=null</AssemblyName>
+        <Properties>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ComponentName</Name>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ComponentID</Name>
+                <Value xmlns:q1="http://microsoft.com/wsdl/types/" xsi:type="q1:guid">00000000-0000-0000-0000-000000000000</Value>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ContinueOnException</Name>
+                <Value xsi:type="xsd:boolean">false</Value>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>Variables</Name>
+                <Value xsi:type="ArrayOfScriptVariable" />
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ScriptCode</Name>
+                <Value xsi:type="xsd:string">using System;
+using System.Collections.Generic;
+using System.Text;
+using LTools.Scripting.Model;
+using LTools.Network.Model;
+
+public class PrimoScript
+{
+	public static LTools.Scripting.CSharp.ScriptDebugger __debug;	
+	public static dynamic d_columnDesignation;
+	public static Dictionary&lt;int, string&gt; dict_dictionarySorting;
+	
+	public void main(LTools.Common.Model.WorkflowData wf)
+    {
+        
+		dict_dictionarySorting = new Dictionary&lt;int, string&gt;();
+		System.Data.DataTable dt_sortableTable = (System.Data.DataTable)wf.GetArgument("io_sortableTable");//Получение таблицы для сортировки
+		List&lt;String&gt; list_customSortingOrder = (List&lt;String&gt;)wf.GetArgument("in_customSortingOrder");//Получение кастомного порядка сортировки
+		String str_columnName = wf.GetArgument("in_columnName")?.ToString();//Получение названия колонки
+		Int32 i_columnNumber = -1;
+		Int32.TryParse(wf.GetArgument("in_columnNumber")?.ToString(), out i_columnNumber);//Получение номера колонки
+		if(dt_sortableTable.Rows.Count &lt;2 || list_customSortingOrder.Count == 0 || (str_columnName == null &amp;&amp; i_columnNumber == -1) ){ //Если строк меньше 2 или лист с кастомным порядком пустой или пользователь не ввел номер и название колонки
+			wf.SetArgument("io_sortableTable", dt_sortableTable);//Передаем на выход не измененную таблицу
+			return;//Выход из подпроцесса
+		}
+		d_columnDesignation = 0;//Переменная для обозначения колонки 
+		List&lt;String&gt; list_allValuesTable = new List&lt;String&gt;();
+		if(str_columnName!=null){
+			d_columnDesignation = str_columnName;//Если введено название, то по названию 
+		}
+		else{
+			d_columnDesignation = i_columnNumber;//Если нет, по номеру
+		}
+		list_allValuesTable = dt_sortableTable.AsEnumerable()
+    			.Select(row =&gt; 
+				d_columnDesignation is string s ? row[s] : row[(int)d_columnDesignation])
+				.Select(value =&gt; value.ToString())
+    			.ToList();//Все значения колонки
+		
+		list_allValuesTable = list_allValuesTable.Distinct().ToList();//Все разные значения колонки
+		list_allValuesTable = list_allValuesTable.Select(item =&gt; item.ToLower()).ToList();//Приведение значений к нижнему регистру
+		list_customSortingOrder = list_customSortingOrder.Select(item =&gt; item.ToLower()).ToList();//Приведение значений к нижнему регистру
+		for(int index = 0; index &lt; list_customSortingOrder.Count; index++){//Проход по листу с пользовательским порядком сортировки
+			dict_dictionarySorting.Add(index, list_customSortingOrder[index]);//Добавление веса для элементов и значения для этого веса
+		}
+		list_allValuesTable = list_allValuesTable.Where(item =&gt; 
+            !list_customSortingOrder.Any(x =&gt; string.Equals(x, item, StringComparison.CurrentCultureIgnoreCase)))
+            .ToList();//Все значения, которые не в кастомном листе для сортировки
+		foreach(String str_value in list_allValuesTable){ //Перебор значений, не в листе сортировки
+			dict_dictionarySorting.Add(Int32.MaxValue, str_value);//Присвоение максимального значения чтоб отправить в самый конец
+		}
+		QuickSortOptimized(dt_sortableTable, 0, dt_sortableTable.Rows.Count-1);//Запуск алгоритма сортировки
+		wf.SetArgument("io_sortableTable", dt_sortableTable);//Передача таблицы обратно
+    }
+	
+	static void QuickSortOptimized(System.Data.DataTable dt_table, Int32 left, Int32 right)
+	{
+	    if (left &lt; right)
+	    {
+	        //Для небольших массивов
+	        if (right - left &lt; 10)
+	        {
+	            InsertionSort(dt_table, left, right);
+	            return;
+	        }
+	
+	        int pivotIndex = MedianOfThreePivot(dt_table, left, right);
+	
+	        QuickSortOptimized(dt_table, left, pivotIndex - 1);
+	        QuickSortOptimized(dt_table, pivotIndex + 1, right);
+	    }
+	}
+	
+	static int MedianOfThreePivot(System.Data.DataTable dt_table, int left, int right)
+	{
+	    int mid = (left + right) / 2;
+	
+		int i_weightLeft = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[left][d_columnDesignation is string s ? s : Convert.ToInt32(d_columnDesignation)].ToString().ToLower()).Key;
+		int i_weightMid = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[mid][d_columnDesignation is string s ? s : Convert.ToInt32(d_columnDesignation)].ToString().ToLower()).Key;
+		int i_weightRight = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[right][d_columnDesignation is string s ? s : Convert.ToInt32(d_columnDesignation)].ToString().ToLower()).Key;
+	    
+		if (i_weightLeft &gt; i_weightMid)
+	        Swap(dt_table, left, mid);
+	
+	    if (i_weightLeft &gt; i_weightRight)
+	        Swap(dt_table, left, right);
+	
+	    if (i_weightMid &gt; i_weightRight)
+	        Swap(dt_table, mid, right);
+	
+	    // Медиана выбрана
+	    Swap(dt_table, mid, right - 1); 
+	    return Partition(dt_table, left, right - 1);
+	}
+
+	static void InsertionSort(System.Data.DataTable dt_table, int left, int right)
+	{
+	    for (int i = left + 1; i &lt;= right; i++)
+	    {
+	        List&lt;String&gt; dt_rowKeyI = dt_table.Rows[i].ItemArray.Select(item =&gt; item?.ToString() ?? "").ToList();
+			int keyI = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_rowKeyI[d_columnDesignation is string s ? s : Convert.ToInt32(d_columnDesignation)].ToString().ToLower()).Key;
+	        int j = i - 1;
+			System.Data.DataRow dt_rowKeyJ = dt_table.Rows[j];
+			int keyJ = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_rowKeyJ[d_columnDesignation is string s ? s : Convert.ToInt32(d_columnDesignation)].ToString().ToLower()).Key;
+	        
+			while (j &gt;= left &amp;&amp; keyJ &gt; keyI)
+	        {
+	            dt_table.Rows[j + 1].ItemArray = dt_table.Rows[j].ItemArray;
+	            j--;
+	        }
+	
+	        dt_table.Rows[j + 1].ItemArray = dt_rowKeyI.Cast&lt;object&gt;().ToArray();
+	    }
+	}
+	
+	static void Swap(System.Data.DataTable dt_table, int i, int j)
+    {
+        System.Data.DataRow temp = dt_table.Rows[i];
+        dt_table.Rows[i].ItemArray = dt_table.Rows[j].ItemArray;
+        dt_table.Rows[j].ItemArray = temp.ItemArray;
+    }
+	 
+	static int Partition(System.Data.DataTable dt_table, int left, int right)
+    {
+        int pivot = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[right][d_columnDesignation is string s ? s : Convert.ToInt32(d_columnDesignation)].ToString().ToLower()).Key;
+		int i = (left - 1);
+
+        for (int j = left; j &lt; right; j++)
+        {
+            int pivotJ = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[j][d_columnDesignation is string s ? s : Convert.ToInt32(d_columnDesignation)].ToString().ToLower()).Key;
+			if (pivotJ &lt;= pivot)
+            {
+                i++;
+                Swap(dt_table, i, j);
+            }
+        }
+        Swap(dt_table, i + 1, right);
+        return i + 1;
+    }
+}</Value>
+            </SerializationItem>
+        </Properties>
+        <IsBreakpoint>false</IsBreakpoint>
+        <IsIgnore>false</IsIgnore>
+        <Components />
+    </RootContainer>
+    <GlobalVariables />
+    <Arguments>
+        <ScriptVariable>
+            <Name>io_sortableTable</Name>
+            <Group />
+            <Comment>Сортируемая таблица</Comment>
+            <DataTypeString>System.Data.DataTable</DataTypeString>
+            <Direction>IN_OUT</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_customSortingOrder</Name>
+            <Group />
+            <DefaultValue xsi:type="xsd:string">new List&lt;String&gt;()</DefaultValue>
+            <Comment>Лист с кастомным порядком сортировки</Comment>
+            <DataTypeString>List&lt;String&gt;</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_columnName</Name>
+            <Group />
+            <Comment>Название колонки для сортировки</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_columnNumber</Name>
+            <Group />
+            <Comment>Номер столбца</Comment>
+            <DataTypeString>Int32</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+    </Arguments>
+    <UseCustomDiagramConnectorFormat>false</UseCustomDiagramConnectorFormat>
+</SerializationRoot>
