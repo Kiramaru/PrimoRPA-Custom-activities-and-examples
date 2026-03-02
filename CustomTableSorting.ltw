@@ -141,6 +141,10 @@ public class PrimoScript
 	        {
 	            dt_table.Rows[j + 1].ItemArray = dt_table.Rows[j].ItemArray;
 	            j--;
+				if(j!=-1){
+					dt_rowKeyJ = dt_table.Rows[j];
+					keyJ = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_rowKeyJ[d_columnDesignation is string s ? s : Convert.ToInt32(d_columnDesignation)].ToString().ToLower()).Key;
+				}
 	        }
 	
 	        dt_table.Rows[j + 1].ItemArray = dt_rowKeyI.Cast&lt;object&gt;().ToArray();

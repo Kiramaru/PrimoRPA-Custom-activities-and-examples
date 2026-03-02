@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-16"?>
+<SerializationRoot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <WorkflowType>2</WorkflowType>
+    <IsTestCase>false</IsTestCase>
+    <UseArgs>false</UseArgs>
+    <ColumnsTableTestData />
+    <RowsTableTestData />
+    <ScriptType>CS</ScriptType>
+    <RootContainer>
+        <ClassName>LTools.Workflow.View.WFOnlyCode</ClassName>
+        <AssemblyName>LTools.Workflow, Version=1.0.6.1, Culture=neutral, PublicKeyToken=null</AssemblyName>
+        <Properties>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ComponentName</Name>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ComponentID</Name>
+                <Value xmlns:q1="http://microsoft.com/wsdl/types/" xsi:type="q1:guid">00000000-0000-0000-0000-000000000000</Value>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ContinueOnException</Name>
+                <Value xsi:type="xsd:boolean">false</Value>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>Variables</Name>
+                <Value xsi:type="ArrayOfScriptVariable" />
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ScriptCode</Name>
+                <Value xsi:type="xsd:string">using System;
+using System.Collections.Generic;
+using System.Text;
+using LTools.Scripting.Model;
+using LTools.Network.Model;
+using DevExpress.Spreadsheet; 
+using DevExpress.Spreadsheet.Export;
+using System.Data;
+
+public class PrimoScript
+{
+	public static LTools.Scripting.CSharp.ScriptDebugger __debug;
+	public static Int32 d_columnDesignation;
+	public static Dictionary&lt;int, string&gt; dict_dictionarySorting;
+	
+	public void main(LTools.Common.Model.WorkflowData wf)
+    {
+    	dict_dictionarySorting = new Dictionary&lt;int, string&gt;();
+		List&lt;String&gt; list_customSortingOrder = (List&lt;String&gt;)wf.GetArgument("in_customSortingOrder");//Получение кастомного порядка сортировки
+		Int32 i_columnNumber = -1;
+		Int32.TryParse(wf.GetArgument("in_columnNumber")?.ToString(), out i_columnNumber);//Получение номера колонки
+		String str_columnCellSorting = String.Empty;
+		str_columnCellSorting = wf.GetArgument("in_columnCellSorting")?.ToString();//Адрес ячейки для определения столбца для сортировки
+		
+		Workbook wb_workbookInput = new Workbook();
+		wb_workbookInput.LoadDocument(wf.GetArgument("in_pathExcelFileInputTable").ToString());//Excel файл
+		Worksheet ws_worksheetInput = wb_workbookInput.Worksheets[wf.GetArgument("in_sheetInputTable").ToString()];//Лист в  Excel файле
+		String str_rangeTableSort = wf.GetArgument("in_rangeTableSort").ToString();
+		CellRange cr_dataRange = ws_worksheetInput.Range[str_rangeTableSort];//Диапазон
+		
+		System.Data.DataTable dt_sortableTable = ws_worksheetInput.CreateDataTable(cr_dataRange, false);//Получение таблицы для сортировки, только колонки без названий колонок
+		DataTableExporter exporter = ws_worksheetInput.CreateDataTableExporter(cr_dataRange, dt_sortableTable, false);//Экспорт таблицы с листа без названий колонок в переменную
+		exporter.Export();
+		
+		if(dt_sortableTable.Rows.Count &lt;2 || list_customSortingOrder.Count == 0 || (str_columnCellSorting == String.Empty &amp;&amp; i_columnNumber == -1) ){ //Если строк меньше 2 или лист с кастомным порядком пустой или пользователь не ввел номер и ячейку для определения номера колонки
+			wf.SetArgument("io_sortableTable", dt_sortableTable);//Передаем на выход не измененную таблицу
+			return;//Выход из подпроцесса
+		}
+		d_columnDesignation = 0;//Переменная для обозначения колонки 
+		List&lt;String&gt; list_allValuesTable = new List&lt;String&gt;();
+		if(str_columnCellSorting != String.Empty){
+			d_columnDesignation = CalculatingColumnNumberCell(str_rangeTableSort, str_columnCellSorting);
+		}
+		else{
+			d_columnDesignation = i_columnNumber;//По номеру колонки
+		}
+		list_allValuesTable = dt_sortableTable.AsEnumerable()
+    			.Select(row =&gt; row[d_columnDesignation])
+				.Select(value =&gt; value.ToString())
+    			.ToList();//Все значения колонки
+		
+		list_allValuesTable = list_allValuesTable.Distinct().ToList();//Все разные значения колонки
+		list_allValuesTable = list_allValuesTable.Select(item =&gt; item.ToLower()).ToList();//Приведение значений к нижнему регистру
+		list_customSortingOrder = list_customSortingOrder.Select(item =&gt; item.ToLower()).ToList();//Приведение значений к нижнему регистру
+		for(int index = 0; index &lt; list_customSortingOrder.Count; index++){//Проход по листу с пользовательским порядком сортировки
+			dict_dictionarySorting.Add(index, list_customSortingOrder[index]);//Добавление веса для элементов и значения для этого веса
+		}
+		list_allValuesTable = list_allValuesTable.Where(item =&gt; 
+            !list_customSortingOrder.Any(x =&gt; string.Equals(x, item, StringComparison.CurrentCultureIgnoreCase)))
+            .ToList();//Все значения, которые не в кастомном листе для сортировки
+		foreach(String str_value in list_allValuesTable){ //Перебор значений, не в листе сортировки
+			dict_dictionarySorting.Add(Int32.MaxValue, str_value);//Присвоение максимального значения чтоб отправить в самый конец
+		}
+		QuickSortOptimized(dt_sortableTable, 0, dt_sortableTable.Rows.Count-1);//Запуск алгоритма сортировки
+		
+		Workbook wb_workbookOutput = new Workbook();
+		wb_workbookOutput.LoadDocument(wf.GetArgument("in_pathExcelFileInsertTable").ToString());//Excel файл
+		Worksheet ws_worksheetOutput = wb_workbookOutput.Worksheets[wf.GetArgument("in_nameSheetInsertingTable").ToString()];//Лист в  Excel файле
+    	
+		String str_rangeInsertingSortedTable = wf.GetArgument("in_rangeInsertingSortedTable").ToString();
+		int i_numberColumn = CalculatingSumLetters(str_rangeInsertingSortedTable, new System.Text.RegularExpressions.Regex(@"^([A-Za-z]+)(\d+)$"));//Номер столбца
+		int i_numberRow = Convert.ToInt32(System.Text.RegularExpressions.Regex.Replace(str_rangeInsertingSortedTable, @"[^\d]", ""));//Номер строки
+		i_numberColumn--;//-1 от номера колонки, тк нумерация с 0
+		i_numberRow--;//-1 от номера строки
+		ws_worksheetOutput.Import(dt_sortableTable, false, i_numberRow, i_numberColumn);//Вставка таблицы без названия колонок
+		wb_workbookOutput.SaveDocument(wf.GetArgument("in_pathExcelFileInsertTable").ToString());//Сохранение файла
+	}
+	
+	static void QuickSortOptimized(System.Data.DataTable dt_table, Int32 left, Int32 right)
+	{
+	    if (left &lt; right)
+	    {
+	        //Для небольших массивов
+	        if (right - left &lt; 10)
+	        {
+	            InsertionSort(dt_table, left, right);
+	            return;
+	        }
+	
+	        int pivotIndex = MedianOfThreePivot(dt_table, left, right);
+	
+	        QuickSortOptimized(dt_table, left, pivotIndex - 1);
+	        QuickSortOptimized(dt_table, pivotIndex + 1, right);
+	    }
+	}
+	
+	static int MedianOfThreePivot(System.Data.DataTable dt_table, int left, int right)
+	{
+	    int mid = (left + right) / 2;
+	
+		int i_weightLeft = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[left][d_columnDesignation].ToString().ToLower()).Key;
+		int i_weightMid = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[mid][d_columnDesignation].ToString().ToLower()).Key;
+		int i_weightRight = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[right][d_columnDesignation].ToString().ToLower()).Key;
+	    
+		if (i_weightLeft &gt; i_weightMid)
+	        Swap(dt_table, left, mid);
+	
+	    if (i_weightLeft &gt; i_weightRight)
+	        Swap(dt_table, left, right);
+	
+	    if (i_weightMid &gt; i_weightRight)
+	        Swap(dt_table, mid, right);
+	
+	    // Медиана выбрана
+	    Swap(dt_table, mid, right - 1); 
+	    return Partition(dt_table, left, right - 1);
+	}
+
+	static void InsertionSort(System.Data.DataTable dt_table, int left, int right)
+	{
+	    for (int i = left + 1; i &lt;= right; i++)
+	    {
+	        List&lt;String&gt; dt_rowKeyI = dt_table.Rows[i].ItemArray.Select(item =&gt; item?.ToString() ?? "").ToList();
+			int keyI = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_rowKeyI[d_columnDesignation].ToString().ToLower()).Key;
+	        int j = i - 1;
+			System.Data.DataRow dt_rowKeyJ = dt_table.Rows[j];
+			int keyJ = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_rowKeyJ[d_columnDesignation].ToString().ToLower()).Key;
+	        
+			while (j &gt;= left &amp;&amp; keyJ &gt; keyI)
+	        {
+				dt_table.Rows[j + 1].ItemArray = dt_table.Rows[j].ItemArray;
+				j--;
+				if(j!=-1){
+					dt_rowKeyJ = dt_table.Rows[j];
+					keyJ = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_rowKeyJ[d_columnDesignation].ToString().ToLower()).Key;
+				}
+	        }
+	
+	        dt_table.Rows[j + 1].ItemArray = dt_rowKeyI.Cast&lt;object&gt;().ToArray();
+	    }
+	}
+	
+	static void Swap(System.Data.DataTable dt_table, int i, int j)
+    {
+        System.Data.DataRow temp = dt_table.Rows[i];
+        dt_table.Rows[i].ItemArray = dt_table.Rows[j].ItemArray;
+        dt_table.Rows[j].ItemArray = temp.ItemArray;
+    }
+	 
+	static int Partition(System.Data.DataTable dt_table, int left, int right)
+    {
+        int pivot = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[right][d_columnDesignation].ToString().ToLower()).Key;
+		int i = (left - 1);
+
+        for (int j = left; j &lt; right; j++)
+        {
+            int pivotJ = dict_dictionarySorting.FirstOrDefault(x =&gt; x.Value == dt_table.Rows[j][d_columnDesignation].ToString().ToLower()).Key;
+			if (pivotJ &lt;= pivot)
+            {
+                i++;
+                Swap(dt_table, i, j);
+            }
+        }
+        Swap(dt_table, i + 1, right);
+        return i + 1;
+    }
+	
+	static int CalculatingColumnNumberCell(String str_rangeTableSort, String str_columnCellSorting){
+		String[] str_cellAddress = str_rangeTableSort.Split(':');//Деление диапазона по :
+		System.Text.RegularExpressions.Regex reg_regexForCell = new System.Text.RegularExpressions.Regex(@"^([A-Za-z]+)(\d+)$");//Для деления адреса ячейки на буквы и цифры
+		int i_sumLettersCellTable = CalculatingSumLetters(str_cellAddress[0], reg_regexForCell);//Сумма букв в первой ячейке из диапазона таблицы
+		int i_sumLettersCellColumn = CalculatingSumLetters(str_columnCellSorting, reg_regexForCell);//Сумма букв в ячейке c колонкой со столбцом
+		return i_sumLettersCellTable - i_sumLettersCellColumn;
+	}
+	
+	static int CalculatingSumLetters(String str_Cell, System.Text.RegularExpressions.Regex reg_regexForCell){
+		System.Text.RegularExpressions.Match m_matchCell = reg_regexForCell.Match(str_Cell);//Деление адреса ячейки на буквы и цифры
+		return CalculatingAmount(m_matchCell.Groups[1].Value);
+	}
+	
+	static int CalculatingAmount(String str_letters){
+		int i_sumLettersCell = 0;
+		foreach (Char c_letter in str_letters){//Перебор всех букв в 1 ячейке
+			i_sumLettersCell = i_sumLettersCell * 26 + (c_letter - 64);//Вычисление суммы
+		}
+		return i_sumLettersCell;
+	}
+}</Value>
+            </SerializationItem>
+        </Properties>
+        <IsBreakpoint>false</IsBreakpoint>
+        <IsIgnore>false</IsIgnore>
+        <Components />
+    </RootContainer>
+    <GlobalVariables />
+    <Arguments>
+        <ScriptVariable>
+            <Name>in_rangeTableSort</Name>
+            <Group>InputData</Group>
+            <Comment>Диапазон таблицы для сортировки</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_sheetInputTable</Name>
+            <Group>InputData</Group>
+            <Comment>Название листа, на котором находится таблица</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_pathExcelFileInputTable</Name>
+            <Group>InputData</Group>
+            <Comment>Путь к Excel файлу со входной таблицей </Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_rangeInsertingSortedTable</Name>
+            <Group>OutputData</Group>
+            <Comment>Диапазон для вставки отсортированной таблицы</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_nameSheetInsertingTable</Name>
+            <Group>OutputData</Group>
+            <Comment>Название листа для вставки отсортированной таблицы</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_pathExcelFileInsertTable</Name>
+            <Group>OutputData</Group>
+            <Comment>Путь к Excel файлу для вставки таблицы</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_customSortingOrder</Name>
+            <Group />
+            <DefaultValue xsi:type="xsd:string">new List&lt;String&gt;()</DefaultValue>
+            <Comment>Лист с кастомным порядком сортировки</Comment>
+            <DataTypeString>List&lt;String&gt;</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_columnNumber</Name>
+            <Group>InputData</Group>
+            <Comment>Номер колонки для сортировки таблицы</Comment>
+            <DataTypeString>Int32</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_columnCellSorting</Name>
+            <Group />
+            <Comment>Ячейка столбца для сортировки</Comment>
+            <DataTypeString>String</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+    </Arguments>
+    <UseCustomDiagramConnectorFormat>false</UseCustomDiagramConnectorFormat>
+</SerializationRoot>
