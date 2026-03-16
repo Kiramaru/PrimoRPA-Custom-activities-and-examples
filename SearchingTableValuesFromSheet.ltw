@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-16"?>
+<SerializationRoot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <WorkflowType>2</WorkflowType>
+    <IsTestCase>false</IsTestCase>
+    <UseArgs>false</UseArgs>
+    <ColumnsTableTestData />
+    <RowsTableTestData />
+    <ScriptType>CS</ScriptType>
+    <RootContainer>
+        <ClassName>LTools.Workflow.View.WFOnlyCode</ClassName>
+        <AssemblyName>LTools.Workflow, Version=1.0.6.1, Culture=neutral, PublicKeyToken=null</AssemblyName>
+        <Properties>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ComponentName</Name>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ComponentID</Name>
+                <Value xmlns:q1="http://microsoft.com/wsdl/types/" xsi:type="q1:guid">00000000-0000-0000-0000-000000000000</Value>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ContinueOnException</Name>
+                <Value xsi:type="xsd:boolean">false</Value>
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>Variables</Name>
+                <Value xsi:type="ArrayOfScriptVariable" />
+            </SerializationItem>
+            <SerializationItem>
+                <IsListValue>false</IsListValue>
+                <Name>ScriptCode</Name>
+                <Value xsi:type="xsd:string">using System;
+using System.Collections.Generic;
+using System.Text;
+using LTools.Scripting.Model;
+using LTools.Network.Model;
+
+public class PrimoScript
+{
+	public static LTools.Scripting.CSharp.ScriptDebugger __debug;
+	
+	public void main(LTools.Common.Model.WorkflowData wf)
+    {
+        System.Data.DataTable dt_tableWhichValuesSearched = (System.Data.DataTable)wf.GetArgument("in_tableWhichValuesSearched");//Таблица для сортировки
+		List&lt;String&gt; list_namesSearch = (List&lt;String&gt;)wf.GetArgument("in_namesSearch");//Список названий для поиска
+		Boolean b_letterCaseAccounting = (Boolean)wf.GetArgument("in_letterCaseAccounting");//Учитывать ли регистр
+		if(!b_letterCaseAccounting){//Если не учитывать
+			list_namesSearch = list_namesSearch.Select(s =&gt; s.ToLower()).ToList();//Уменьшаем регистр всех элементов
+		}
+		
+		Dictionary&lt;String, List&lt;String&gt;&gt; dict_cellDataValues = dt_tableWhichValuesSearched.AsEnumerable()
+	    .Select((row, rIdx) =&gt; new { row, rIdx })
+	    .SelectMany(x =&gt; x.row.ItemArray.Select((cell, cIdx) =&gt; 
+	        new
+	        {
+	            Key = $"{x.rIdx}:{cIdx}",
+	            Value = cell?.ToString() ?? "",
+	            ColumnName = dt_tableWhichValuesSearched.Columns[cIdx].ColumnName
+	        }))
+	    .Where(x =&gt; list_namesSearch.Contains(b_letterCaseAccounting ? x.Value : x.Value.ToLower()))
+	    .ToDictionary(
+	        x =&gt; x.Key, 
+	        x =&gt; new List&lt;string&gt; { x.Value, x.ColumnName }
+	    );//Занесение в словарь в ключ строку и столбец ячейки, в лист значений само значение ячейки и название столбца
+			
+		wf.SetArgument("out_cellDataValues", dict_cellDataValues);//Передача в  основного робота словаря
+	}
+}</Value>
+            </SerializationItem>
+        </Properties>
+        <IsBreakpoint>false</IsBreakpoint>
+        <IsIgnore>false</IsIgnore>
+        <Components />
+    </RootContainer>
+    <GlobalVariables />
+    <Arguments>
+        <ScriptVariable>
+            <Name>in_tableWhichValuesSearched</Name>
+            <Group />
+            <Comment>Таблица в которой будет выполнен поиск значений</Comment>
+            <DataTypeString>System.Data.DataTable</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_namesSearch</Name>
+            <Group />
+            <Comment>Список названий для поиска в таблице</Comment>
+            <DataTypeString>List&lt;String&gt;</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>out_cellDataValues</Name>
+            <Group />
+            <Comment>Словарь с данными ячеек</Comment>
+            <DataTypeString>System.Collections.Generic.Dictionary&lt;String,List&lt;String&gt;&gt;</DataTypeString>
+            <Direction>OUT</Direction>
+        </ScriptVariable>
+        <ScriptVariable>
+            <Name>in_letterCaseAccounting</Name>
+            <Group />
+            <Comment>Учитывать ли регистр</Comment>
+            <DataTypeString>Boolean</DataTypeString>
+            <Direction>IN</Direction>
+        </ScriptVariable>
+    </Arguments>
+    <UseCustomDiagramConnectorFormat>false</UseCustomDiagramConnectorFormat>
+</SerializationRoot>
